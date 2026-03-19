@@ -83,17 +83,29 @@ pub async fn validate_roaming(
         }
     };
 
-    let target_status: String = target_hub.try_get("status").unwrap_or_default();
+    let target_status: String = match target_hub.try_get("status") {
+        Ok(v) => v,
+        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("Row decode error: {}", e)}))).into_response(),
+    };
     let allowed = target_status == "online";
-    let target_slug: String = target_hub.try_get("slug").unwrap_or_default();
+    let target_slug: String = match target_hub.try_get("slug") {
+        Ok(v) => v,
+        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("Row decode error: {}", e)}))).into_response(),
+    };
     let reason = if !allowed {
         Some(format!("Target hub '{}' is not online", target_slug))
     } else {
         None
     };
 
-    let origin_id: Uuid = origin_hub.try_get("id").unwrap_or_default();
-    let target_id: Uuid = target_hub.try_get("id").unwrap_or_default();
+    let origin_id: Uuid = match origin_hub.try_get("id") {
+        Ok(v) => v,
+        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("Row decode error: {}", e)}))).into_response(),
+    };
+    let target_id: Uuid = match target_hub.try_get("id") {
+        Ok(v) => v,
+        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("Row decode error: {}", e)}))).into_response(),
+    };
 
     let _ = sqlx::query(
         r#"

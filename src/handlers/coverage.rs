@@ -42,28 +42,48 @@ pub async fn get_coverage_map(State(state): State<AppState>) -> Response {
 
     let mut hasher = Sha256::new();
     for row in &rows {
-        let id: Uuid = row.try_get("id").unwrap_or_default();
-        let updated_at: chrono::DateTime<chrono::Utc> = row.try_get("updated_at").unwrap_or_else(|_| chrono::Utc::now());
+        let id: Uuid = match row.try_get("id") {
+            Ok(v) => v,
+            Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("Row decode error: {}", e)}))).into_response(),
+        };
+        let updated_at: chrono::DateTime<chrono::Utc> = match row.try_get("updated_at") {
+            Ok(v) => v,
+            Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("Row decode error: {}", e)}))).into_response(),
+        };
         hasher.update(id.to_string().as_bytes());
         hasher.update(updated_at.to_string().as_bytes());
     }
     let checksum = hex::encode(hasher.finalize());
 
-    let features: Vec<Value> = rows
-        .iter()
-        .map(|row| {
-            let id: Uuid = row.try_get("id").unwrap_or_default();
-            let name: String = row.try_get("name").unwrap_or_default();
-            let slug: String = row.try_get("slug").unwrap_or_default();
-            let api_url: String = row.try_get("api_url").unwrap_or_default();
-            let status: String = row.try_get("status").unwrap_or_default();
+    let mut features: Vec<Value> = Vec::with_capacity(rows.len());
+    for row in &rows {
+            let id: Uuid = match row.try_get("id") {
+                Ok(v) => v,
+                Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("Row decode error: {}", e)}))).into_response(),
+            };
+            let name: String = match row.try_get("name") {
+                Ok(v) => v,
+                Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("Row decode error: {}", e)}))).into_response(),
+            };
+            let slug: String = match row.try_get("slug") {
+                Ok(v) => v,
+                Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("Row decode error: {}", e)}))).into_response(),
+            };
+            let api_url: String = match row.try_get("api_url") {
+                Ok(v) => v,
+                Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("Row decode error: {}", e)}))).into_response(),
+            };
+            let status: String = match row.try_get("status") {
+                Ok(v) => v,
+                Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("Row decode error: {}", e)}))).into_response(),
+            };
             let metadata: Value = row.try_get("metadata").unwrap_or(Value::Null);
             let geometry_str: Option<String> = row.try_get("geometry").ok().flatten();
             let geometry: Value = geometry_str
                 .and_then(|g| serde_json::from_str(&g).ok())
                 .unwrap_or(Value::Null);
 
-            json!({
+            features.push(json!({
                 "type": "Feature",
                 "geometry": geometry,
                 "properties": {
@@ -74,9 +94,8 @@ pub async fn get_coverage_map(State(state): State<AppState>) -> Response {
                     "status": status,
                     "metadata": metadata,
                 }
-            })
-        })
-        .collect();
+            }));
+    }
 
     Json(json!({
         "version": chrono::Utc::now().to_rfc3339(),
@@ -106,8 +125,14 @@ pub async fn get_coverage_version(State(state): State<AppState>) -> Response {
 
     let mut hasher = Sha256::new();
     for row in &rows {
-        let id: Uuid = row.try_get("id").unwrap_or_default();
-        let updated_at: chrono::DateTime<chrono::Utc> = row.try_get("updated_at").unwrap_or_else(|_| chrono::Utc::now());
+        let id: Uuid = match row.try_get("id") {
+            Ok(v) => v,
+            Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("Row decode error: {}", e)}))).into_response(),
+        };
+        let updated_at: chrono::DateTime<chrono::Utc> = match row.try_get("updated_at") {
+            Ok(v) => v,
+            Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("Row decode error: {}", e)}))).into_response(),
+        };
         hasher.update(id.to_string().as_bytes());
         hasher.update(updated_at.to_string().as_bytes());
     }
