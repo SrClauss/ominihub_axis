@@ -1,0 +1,25 @@
+version: '3.8'
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_DB: axis_core
+      POSTGRES_USER: axis_user
+      POSTGRES_PASSWORD: axis_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  axis-core:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: postgres://axis_user:axis_password@postgres:5432/axis_core
+      RUST_LOG: axis_core=info
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
