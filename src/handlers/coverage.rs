@@ -24,7 +24,7 @@ pub async fn get_coverage_map(State(state): State<AppState>) -> Response {
             metadata,
             ST_AsGeoJSON(boundary)::text as geometry
         FROM hubs
-        WHERE status != 'offline'
+        WHERE status = 'online'
         "#
     )
     .fetch_all(&state.db)
@@ -108,7 +108,7 @@ pub async fn get_coverage_map(State(state): State<AppState>) -> Response {
 
 pub async fn get_coverage_version(State(state): State<AppState>) -> Response {
     let rows = match sqlx::query(
-        "SELECT id, updated_at FROM hubs WHERE status != 'offline'"
+        "SELECT id, updated_at FROM hubs WHERE status = 'online'"
     )
     .fetch_all(&state.db)
     .await
@@ -183,9 +183,18 @@ pub async fn validate_coverage(
 
     let (confirmed, hub_id, hub_name, api_url) = match &hub_row {
         Some(row) => {
-            let id: Uuid = row.try_get("id").unwrap_or_default();
-            let name: String = row.try_get("name").unwrap_or_default();
-            let url: String = row.try_get("api_url").unwrap_or_default();
+            let id: Uuid = match row.try_get("id") {
+                Ok(v) => v,
+                Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("Row decode error: {}", e)}))).into_response(),
+            };
+            let name: String = match row.try_get("name") {
+                Ok(v) => v,
+                Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("Row decode error: {}", e)}))).into_response(),
+            };
+            let url: String = match row.try_get("api_url") {
+                Ok(v) => v,
+                Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("Row decode error: {}", e)}))).into_response(),
+            };
             let confirmed = req.detected_hub_id.map(|did| did == id).unwrap_or(false);
             (confirmed, Some(id.to_string()), Some(name), Some(url))
         }

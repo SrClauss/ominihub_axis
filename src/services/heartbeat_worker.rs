@@ -6,8 +6,14 @@ use uuid::Uuid;
 
 use crate::services::event_broadcaster::{EventBroadcaster, WsEvent};
 
+/// How long (in seconds) a hub can go without a heartbeat before being marked offline.
+const HEARTBEAT_TIMEOUT_SECS: u64 = 60;
+
+/// How often (in seconds) the worker checks for stale hubs.
+const WORKER_INTERVAL_SECS: u64 = 30;
+
 pub async fn run_heartbeat_worker(pool: PgPool, broadcaster: EventBroadcaster) {
-    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(30));
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(WORKER_INTERVAL_SECS));
 
     loop {
         interval.tick().await;
@@ -34,10 +40,11 @@ async fn check_and_update_offline_hubs(
         UPDATE hubs
         SET status = 'offline', updated_at = NOW()
         WHERE status = 'online'
-          AND (last_heartbeat IS NULL OR last_heartbeat < NOW() - INTERVAL '60 seconds')
+          AND (last_heartbeat IS NULL OR last_heartbeat < NOW() - ($1 || ' seconds')::interval)
         RETURNING id, name, slug
         "#
     )
+    .bind(HEARTBEAT_TIMEOUT_SECS as i64)
     .fetch_all(pool)
     .await?;
 

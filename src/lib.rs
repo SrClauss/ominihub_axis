@@ -22,7 +22,7 @@ pub struct AppState {
 
 pub async fn create_app() -> Result<Router> {
     let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://axis_user:axis_password@localhost:5432/axis_core".to_string());
+        .expect("DATABASE_URL environment variable must be set");
 
     let pool = db::pool::create_pool(&database_url).await?;
 
@@ -65,10 +65,11 @@ async fn run_migrations(pool: &PgPool) -> Result<()> {
         include_str!("../migrations/003_create_coverage_versions.sql"),
         include_str!("../migrations/004_create_hub_validations.sql"),
         include_str!("../migrations/005_create_roaming_validations.sql"),
+        include_str!("../migrations/006_add_user_hub_fk.sql"),
     ];
 
     for sql in &migration_files {
-        sqlx::query(sql).execute(pool).await?;
+        sqlx::raw_sql(sql).execute(pool).await?;
     }
 
     tracing::info!("Migrations completed successfully");

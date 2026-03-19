@@ -96,7 +96,16 @@ pub async fn heartbeat(
         }
     };
 
-    let current_status: String = current.try_get("status").unwrap_or_default();
+    let current_status: String = match current.try_get("status") {
+        Ok(v) => v,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": format!("Row decode error: {}", e)})),
+            )
+                .into_response();
+        }
+    };
     let was_offline = current_status != "online";
 
     match sqlx::query(
@@ -126,8 +135,8 @@ pub async fn heartbeat(
             .fetch_optional(&state.db)
             .await
         {
-            let name: String = hub_row.try_get("name").unwrap_or_default();
-            let slug: String = hub_row.try_get("slug").unwrap_or_default();
+            let name: String = hub_row.try_get("name").unwrap_or_else(|_| String::new());
+            let slug: String = hub_row.try_get("slug").unwrap_or_else(|_| String::new());
             state.broadcaster.broadcast(WsEvent {
                 event: "hub.online".to_string(),
                 timestamp: Utc::now(),
