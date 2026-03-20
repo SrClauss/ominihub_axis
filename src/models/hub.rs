@@ -12,6 +12,7 @@ pub struct Hub {
     pub admin_email: Option<String>,
     pub status: String,
     pub last_heartbeat: Option<DateTime<Utc>>,
+    pub boundary: Value,
     pub metadata: Value,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -36,4 +37,10 @@ pub struct HeartbeatRequest {
 #[derive(Debug, Deserialize)]
 pub struct UpdateBoundaryRequest {
     pub boundary: Value,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct LocationCheckRequest {
+    pub lat: f64,
+    pub lng: f64,
 }

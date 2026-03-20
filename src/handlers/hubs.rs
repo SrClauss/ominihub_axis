@@ -11,7 +11,7 @@ use uuid::Uuid;
 
 use crate::{
     middleware::auth::AuthClaims,
-    models::hub::{Hub, HeartbeatRequest, RegisterHubRequest, UpdateBoundaryRequest},
+    models::hub::{Hub, HeartbeatRequest, LocationCheckRequest, RegisterHubRequest, UpdateBoundaryRequest},
     services::event_broadcaster::WsEvent,
     AppState,
 };
@@ -37,7 +37,7 @@ pub async fn register_hub(
         INSERT INTO hubs (name, slug, boundary, api_url, admin_email, metadata)
         VALUES ($1, $2, ST_GeomFromGeoJSON($3)::geometry, $4, $5, $6)
         RETURNING id, name, slug, api_url, admin_email, status, last_heartbeat,
-                  metadata, created_at, updated_at
+                  ST_AsGeoJSON(boundary)::json AS boundary, metadata, created_at, updated_at
         "#,
     )
     .bind(&req.name)
@@ -156,7 +156,7 @@ pub async fn list_hubs(State(state): State<AppState>) -> Response {
     match sqlx::query_as::<_, Hub>(
         r#"
         SELECT id, name, slug, api_url, admin_email, status, last_heartbeat,
-               metadata, created_at, updated_at
+               ST_AsGeoJSON(boundary)::json AS boundary, metadata, created_at, updated_at
         FROM hubs
         ORDER BY name
         "#,
@@ -180,11 +180,10 @@ pub async fn hub_status(
     match sqlx::query_as::<_, Hub>(
         r#"
         SELECT id, name, slug, api_url, admin_email, status, last_heartbeat,
-               metadata, created_at, updated_at
+               ST_AsGeoJSON(boundary)::json AS boundary, metadata, created_at, updated_at
         FROM hubs WHERE id = $1
         "#,
-    )
-    .bind(id)
+    )    .bind(id)
     .fetch_optional(&state.db)
     .await
     {
@@ -200,6 +199,63 @@ pub async fn hub_status(
         )
             .into_response(),
     }
+}
+
+pub async fn check_hub_contains_location(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(req): Json<LocationCheckRequest>,
+) -> Response {
+    let row = match sqlx::query(
+        r#"
+        SELECT ST_Contains(boundary, ST_SetSRID(ST_MakePoint($1, $2), 4326)) AS inside
+        FROM hubs
+        WHERE id = $3
+        "#,
+    )
+    .bind(req.lng)
+    .bind(req.lat)
+    .bind(id)
+    .fetch_optional(&state.db)
+    .await
+    {
+        Ok(r) => r,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": format!("Database error: {}", e)})),
+            )
+                .into_response();
+        }
+    };
+
+    let contains = match row {
+        Some(row) => match row.try_get::<bool, _>("inside") {
+            Ok(val) => val,
+            Err(e) => {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({"error": format!("Row decode error: {}", e)})),
+                )
+                    .into_response();
+            }
+        },
+        None => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({"error": "Hub not found"})),
+            )
+                .into_response();
+        }
+    };
+
+    Json(json!({
+        "hub_id": id.to_string(),
+        "inside": contains,
+        "lat": req.lat,
+        "lng": req.lng,
+    }))
+    .into_response()
 }
 
 pub async fn update_boundary(
