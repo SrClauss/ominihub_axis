@@ -48,6 +48,24 @@ pub async fn create_app() -> Result<Router> {
     Ok(routes::build_router(state))
 }
 
+/// Build a Router with an already-created pool and explicit RSA key pair.
+/// Intended for use in integration tests so that the JWT key pair is known
+/// to the test ahead of time.
+pub fn build_test_router(
+    pool: PgPool,
+    jwt_private_key: String,
+    jwt_public_key: String,
+) -> Router {
+    let state = AppState {
+        db: pool,
+        jwt_private_key,
+        jwt_public_key,
+        mercadopago_token: None,
+        app_base_url: "http://localhost:8080".to_string(),
+    };
+    routes::build_router(state)
+}
+
 fn get_or_generate_rsa_keys() -> (String, String) {
     let private_key = std::env::var("JWT_PRIVATE_KEY").ok();
     let public_key = std::env::var("JWT_PUBLIC_KEY").ok();
