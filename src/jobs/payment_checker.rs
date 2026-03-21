@@ -33,10 +33,10 @@ pub async fn payment_check_worker(pool: PgPool) {
 
         // Step 2: Mark overdue payments
         match payment_svc.mark_overdue_payments().await {
-            Ok(hub_ids) => {
-                tracing::info!("payment_checker: marked {} payments as overdue", hub_ids.len());
-                for hub_id in &hub_ids {
-                    let _ = notif_svc.notify_payment_overdue(*hub_id, 1).await;
+            Ok(hub_overdue) => {
+                tracing::info!("payment_checker: marked overdue payments for {} hubs", hub_overdue.len());
+                for (hub_id, days) in &hub_overdue {
+                    let _ = notif_svc.notify_payment_overdue(*hub_id, *days).await;
                 }
             }
             Err(e) => tracing::error!("payment_checker: error marking overdue: {}", e),
