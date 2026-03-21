@@ -92,20 +92,27 @@ impl PaymentService {
         Ok(payment)
     }
 
-    pub async fn mark_overdue_payments(&self) -> Result<Vec<Uuid>> {
-        let hub_ids = sqlx::query_scalar::<_, Uuid>(
+    pub async fn mark_overdue_payments(&self) -> Result<Vec<(Uuid, i64)>> {
+        // Returns (hub_id, days_overdue) for each hub that has newly-overdue payments.
+        let rows = sqlx::query_as::<_, (Uuid, i64)>(
             r#"
-            UPDATE franchise_payments
-            SET status = 'overdue', updated_at = NOW()
-            WHERE status = 'pending'
-              AND due_date < CURRENT_DATE
-            RETURNING hub_id
+            WITH updated AS (
+                UPDATE franchise_payments
+                SET status = 'overdue', updated_at = NOW()
+                WHERE status = 'pending'
+                  AND due_date < CURRENT_DATE
+                RETURNING hub_id,
+                    (CURRENT_DATE - due_date)::bigint AS days_overdue
+            )
+            SELECT hub_id, MAX(days_overdue) AS days_overdue
+            FROM updated
+            GROUP BY hub_id
             "#,
         )
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(hub_ids)
+        Ok(rows)
     }
 
     pub async fn generate_monthly_charges(&self) -> Result<i64> {
@@ -147,7 +154,7 @@ impl PaymentService {
         req: CreateAdjustmentRequest,
         admin_id: Uuid,
     ) -> Result<Option<PaymentAdjustment>> {
-        let adj_type = format!("{:?}", req.adjustment_type).to_lowercase();
+        let adj_type = req.adjustment_type.to_string();
 
         let adjustment = sqlx::query_as::<_, PaymentAdjustment>(
             r#"

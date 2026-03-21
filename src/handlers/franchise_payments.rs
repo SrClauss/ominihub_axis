@@ -17,6 +17,7 @@ use crate::{
     },
     services::{
         hub_status_service::HubStatusService,
+        notification_service::NotificationService,
         payment_service::PaymentService,
     },
     AppState,
@@ -86,7 +87,19 @@ pub async fn admin_mark_paid(
 
     let svc = PaymentService::new(state.db.clone());
     match svc.mark_paid(id, req).await {
-        Ok(Some(payment)) => Json(payment).into_response(),
+        Ok(Some(payment)) => {
+            // After marking as paid, recalculate hub status and send notification.
+            // These are best-effort side effects; log errors but still return the payment.
+            let status_svc = HubStatusService::new(state.db.clone());
+            let notif_svc = NotificationService::new(state.db.clone());
+            if let Err(e) = status_svc.update_hub_status(payment.hub_id, None).await {
+                tracing::error!(hub_id = %payment.hub_id, "admin_mark_paid: failed to update hub status: {}", e);
+            }
+            if let Err(e) = notif_svc.notify_payment_received(payment.hub_id, payment.amount).await {
+                tracing::error!(hub_id = %payment.hub_id, "admin_mark_paid: failed to send payment_received notification: {}", e);
+            }
+            Json(payment).into_response()
+        }
         Ok(None) => (StatusCode::NOT_FOUND, Json(json!({"error": "Payment not found"}))).into_response(),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
