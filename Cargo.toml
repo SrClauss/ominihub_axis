@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-axum = { version = "0.7", features = ["ws", "macros"] }
+axum = { version = "0.7", features = ["macros"] }
 tokio = { version = "1", features = ["full"] }
 tower = "0.4"
 tower-http = { version = "0.5", features = ["cors", "trace", "limit"] }
@@ -23,8 +23,6 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 dotenvy = "0.15"
 anyhow = "1"
 thiserror = "1"
-tokio-stream = "0.1"
-futures = "0.3"
 rsa = { version = "0.9", features = ["pem"] }
 rand = "0.8"
 

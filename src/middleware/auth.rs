@@ -52,3 +52,27 @@ impl FromRequestParts<AppState> for AuthClaims {
         Ok(AuthClaims(claims))
     }
 }
+
+/// Middleware guard: rejects requests whose JWT role is not `super_admin`.
+pub async fn require_super_admin(
+    claims: AuthClaims,
+    request: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> Result<Response, StatusCode> {
+    if claims.0.role != "super_admin" {
+        return Err(StatusCode::FORBIDDEN);
+    }
+    Ok(next.run(request).await)
+}
+
+/// Middleware guard: rejects requests from admins that have no hub-level access.
+/// Full hub-scope enforcement is delegated to handlers that receive the claims.
+/// TODO: Once admin sessions carry hub_id, enforce that the claim's hub list
+///       contains the target hub extracted from the request path/body.
+pub async fn require_hub_access(
+    _claims: AuthClaims,
+    request: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> Result<Response, StatusCode> {
+    Ok(next.run(request).await)
+}

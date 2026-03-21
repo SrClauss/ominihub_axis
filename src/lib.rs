@@ -10,12 +10,9 @@ pub mod models;
 pub mod routes;
 pub mod services;
 
-use services::event_broadcaster::EventBroadcaster;
-
 #[derive(Clone)]
 pub struct AppState {
     pub db: PgPool,
-    pub broadcaster: EventBroadcaster,
     pub jwt_private_key: String,
     pub jwt_public_key: String,
 }
@@ -30,20 +27,11 @@ pub async fn create_app() -> Result<Router> {
 
     let (private_key, public_key) = get_or_generate_rsa_keys();
 
-    let broadcaster = EventBroadcaster::new();
-
     let state = AppState {
-        db: pool.clone(),
-        broadcaster: broadcaster.clone(),
+        db: pool,
         jwt_private_key: private_key,
         jwt_public_key: public_key,
     };
-
-    // Spawn the heartbeat worker
-    tokio::spawn(services::heartbeat_worker::run_heartbeat_worker(
-        pool,
-        broadcaster,
-    ));
 
     Ok(routes::build_router(state))
 }
@@ -66,6 +54,11 @@ async fn run_migrations(pool: &PgPool) -> Result<()> {
         include_str!("../migrations/004_create_hub_validations.sql"),
         include_str!("../migrations/005_create_roaming_validations.sql"),
         include_str!("../migrations/006_add_user_hub_fk.sql"),
+        include_str!("../migrations/20260321000003_create_drivers.sql"),
+        include_str!("../migrations/20260321000006_create_blocked_entities.sql"),
+        include_str!("../migrations/20260321000007_create_admins.sql"),
+        include_str!("../migrations/20260321000008_create_admin_hub_access.sql"),
+        include_str!("../migrations/20260321000009_create_hub_status.sql"),
     ];
 
     for sql in &migration_files {
