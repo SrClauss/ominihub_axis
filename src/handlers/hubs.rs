@@ -12,7 +12,6 @@ use uuid::Uuid;
 use crate::{
     middleware::auth::AuthClaims,
     models::hub::{Hub, HeartbeatRequest, LocationCheckRequest, RegisterHubRequest, UpdateBoundaryRequest},
-    services::event_broadcaster::WsEvent,
     AppState,
 };
 
@@ -130,23 +129,7 @@ pub async fn heartbeat(
     }
 
     if was_offline {
-        if let Ok(Some(hub_row)) = sqlx::query("SELECT name, slug FROM hubs WHERE id = $1")
-            .bind(id)
-            .fetch_optional(&state.db)
-            .await
-        {
-            let name: String = hub_row.try_get("name").unwrap_or_else(|_| String::new());
-            let slug: String = hub_row.try_get("slug").unwrap_or_else(|_| String::new());
-            state.broadcaster.broadcast(WsEvent {
-                event: "hub.online".to_string(),
-                timestamp: Utc::now(),
-                data: json!({
-                    "hub_id": id.to_string(),
-                    "hub_name": name,
-                    "hub_slug": slug,
-                }),
-            });
-        }
+        tracing::info!("Hub {} came back online", id);
     }
 
     Json(json!({"status": "ok", "timestamp": Utc::now().to_rfc3339()})).into_response()
@@ -302,14 +285,6 @@ pub async fn update_boundary(
                 .into_response();
         }
     }
-
-    state.broadcaster.broadcast(WsEvent {
-        event: "coverage.updated".to_string(),
-        timestamp: Utc::now(),
-        data: json!({
-            "hub_id": id.to_string(),
-        }),
-    });
 
     Json(json!({"status": "updated", "hub_id": id.to_string()})).into_response()
 }

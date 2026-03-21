@@ -6,7 +6,7 @@ use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 
 use crate::{
-    handlers::{auth, coverage, hubs, roaming, ws},
+    handlers::{auth, coverage, hubs, roaming},
     AppState,
 };
 
@@ -33,7 +33,6 @@ pub fn build_router(state: AppState) -> Router {
         .route("/hubs/:id/boundary", put(hubs::update_boundary))
         .route("/hubs/:id/contains", post(hubs::check_hub_contains_location))
         .route("/roaming/validate", post(roaming::validate_roaming))
-        .route("/v1/stream", get(ws::ws_handler))
         .layer(cors)
         .layer(TraceLayer::new_for_http())
         .with_state(state)
