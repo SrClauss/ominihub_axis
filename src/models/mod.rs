@@ -1,6 +1,10 @@
 pub mod admin;
 pub mod blocked_entity;
 pub mod driver;
+pub mod franchise_notification;
+pub mod franchise_payment;
 pub mod hub;
+pub mod hub_status_history;
+pub mod payment_adjustment;
 pub mod roaming;
 pub mod user;

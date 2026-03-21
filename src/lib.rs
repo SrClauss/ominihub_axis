@@ -5,6 +5,7 @@ use sqlx::PgPool;
 pub mod config;
 pub mod db;
 pub mod handlers;
+pub mod jobs;
 pub mod middleware;
 pub mod models;
 pub mod routes;
@@ -15,6 +16,8 @@ pub struct AppState {
     pub db: PgPool,
     pub jwt_private_key: String,
     pub jwt_public_key: String,
+    pub mercadopago_token: Option<String>,
+    pub app_base_url: String,
 }
 
 pub async fn create_app() -> Result<Router> {
@@ -27,11 +30,20 @@ pub async fn create_app() -> Result<Router> {
 
     let (private_key, public_key) = get_or_generate_rsa_keys();
 
+    let mercadopago_token = std::env::var("MERCADOPAGO_ACCESS_TOKEN").ok();
+    let app_base_url = std::env::var("APP_BASE_URL")
+        .unwrap_or_else(|_| "http://localhost:8080".to_string());
+
     let state = AppState {
-        db: pool,
+        db: pool.clone(),
         jwt_private_key: private_key,
         jwt_public_key: public_key,
+        mercadopago_token,
+        app_base_url,
     };
+
+    // Spawn the daily payment checker background job
+    tokio::spawn(jobs::payment_checker::payment_check_worker(pool));
 
     Ok(routes::build_router(state))
 }
@@ -59,6 +71,12 @@ async fn run_migrations(pool: &PgPool) -> Result<()> {
         include_str!("../migrations/20260321000007_create_admins.sql"),
         include_str!("../migrations/20260321000008_create_admin_hub_access.sql"),
         include_str!("../migrations/20260321000009_create_hub_status.sql"),
+        include_str!("../migrations/20260321001001_alter_hubs_billing.sql"),
+        include_str!("../migrations/20260321001002_create_franchise_payments.sql"),
+        include_str!("../migrations/20260321001003_create_payment_adjustments.sql"),
+        include_str!("../migrations/20260321001004_create_hub_status_history.sql"),
+        include_str!("../migrations/20260321001005_create_franchise_notifications.sql"),
+        include_str!("../migrations/20260321001006_create_payment_webhook_logs.sql"),
     ];
 
     for sql in &migration_files {
